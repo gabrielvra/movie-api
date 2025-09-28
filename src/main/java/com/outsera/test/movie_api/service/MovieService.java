@@ -1,10 +1,19 @@
 package com.outsera.test.movie_api.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.outsera.test.movie_api.dto.PremioIntervaloDTO;
+import com.outsera.test.movie_api.entity.Movie;
 import com.outsera.test.movie_api.helper.CSVHelper;
+import com.outsera.test.movie_api.record.PremioIntervalo;
 import com.outsera.test.movie_api.repository.MovieRepository;
 
 import jakarta.annotation.PostConstruct;
@@ -12,20 +21,75 @@ import jakarta.annotation.PostConstruct;
 @Service
 public class MovieService {
 
-    @Autowired
-    private MovieRepository movieRepository;
+    private static final Logger logger = LoggerFactory.getLogger(MovieService.class);
+
+    private final MovieRepository movieRepository;
 
     @Value("${csv.file.path}")
     private String filePath;
 
+    public MovieService(MovieRepository movieRepository) {
+        this.movieRepository = movieRepository;
+    }
+
     @PostConstruct
     public void loadMoviesFromFile(){
         try{
+            logger.info("Iniciando carga de filmes do arquivo CSV: {}", this.filePath);
             movieRepository.saveAll(CSVHelper.loadMoviesFromCSV(this.filePath));
+            logger.info("Processo de carga de filmes concluído com sucesso.");
 		} catch (Exception e) {
-			System.out.println("Erro ao carregar filmes do arquivo CSV: " + e.getMessage());
+            logger.error("Erro ao carregar filmes do arquivo CSV: ", e);
 		}
     }
 
-    
+    /**
+     * Calcula os intervalos entre prêmios para cada produtor e retorna os produtores com os menores e maiores intervalos.
+     * @return Instância de {@link PremioIntervaloDTO} com lista de produtores com menor e maior intervalo entre prêmios.
+     */
+    public PremioIntervaloDTO calcularIntervalos() {
+        List<Movie> movies = movieRepository.buscarVencedores();
+
+        Map<String, List<PremioIntervalo>> invervaloProdutores = new HashMap<>();
+
+        for (Movie movie : movies) {
+            // Faz o split dos produtores considerando vírgulas e " e "
+            String[] produtores = movie.getProducers().split(",| and ");
+
+            for (String produtor : produtores) {
+                produtor = produtor.trim();
+
+                invervaloProdutores.putIfAbsent(produtor, new ArrayList<>());
+                List<PremioIntervalo> intervaloEntrePremios = invervaloProdutores.get(produtor);
+
+                if (!intervaloEntrePremios.isEmpty()) {
+                    //Busca o último premio do produtor para calcular o intervalo
+                    PremioIntervalo last = intervaloEntrePremios.get(intervaloEntrePremios.size() - 1);
+                    int gap = movie.getYearReleased() - last.followingWin();
+
+                    intervaloEntrePremios.add(new PremioIntervalo(produtor, gap, last.followingWin(), movie.getYearReleased()));
+                } else {
+                    intervaloEntrePremios.add(new PremioIntervalo(produtor, 0, movie.getYearReleased(), movie.getYearReleased()));
+                }
+            }
+        }
+        //Consolida todos os intevalos em uma única lista, filtrando apenas os que possuem intervalo maior que 0
+        List<PremioIntervalo> todos = invervaloProdutores.values().stream()
+            .flatMap(List::stream)
+            .filter(i -> i.interval() > 0)
+            .toList();
+
+        Integer minGap = todos.stream().mapToInt(PremioIntervalo::interval).min().orElse(0);
+        Integer maxGap = todos.stream().mapToInt(PremioIntervalo::interval).max().orElse(0);
+
+        List<PremioIntervalo> minList = todos.stream()
+                .filter(i -> i.interval().equals(minGap))
+                .toList();
+
+        List<PremioIntervalo> maxList = todos.stream()
+                .filter(i -> i.interval().equals(maxGap))
+                .toList();
+
+        return new PremioIntervaloDTO(minList, maxList);
+    }
 }
