@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.outsera.test.movie_api.dto.PremioIntervaloDTO;
+import com.outsera.test.movie_api.exception.ErroProcessamento;
 import com.outsera.test.movie_api.service.MovieService;
 
 @RestController
@@ -20,7 +21,11 @@ public class MovieController {
 
     @GetMapping("/intervalos-premio")
     public ResponseEntity<PremioIntervaloDTO> getIntervaloPremio() {
-        PremioIntervaloDTO resposta = movieService.calcularIntervalos();
-        return ResponseEntity.ok(resposta);
+        try {
+            PremioIntervaloDTO resposta = movieService.calcularIntervalos();
+            return ResponseEntity.ok(resposta);
+        } catch (Exception e) {
+            throw new ErroProcessamento("Erro ao processar a requisição: " + e.getMessage());
+        }
     }
 }

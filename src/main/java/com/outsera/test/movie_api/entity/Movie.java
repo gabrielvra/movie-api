@@ -1,4 +1,4 @@
-package com.outsera.test.movie_api.model;
+package com.outsera.test.movie_api.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import com.outsera.test.movie_api.model.Movie;
+import com.outsera.test.movie_api.entity.Movie;
 
 public final class CSVHelper {
 
