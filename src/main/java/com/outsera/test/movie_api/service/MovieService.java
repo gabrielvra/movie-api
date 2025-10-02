@@ -52,12 +52,17 @@ public class MovieService {
 
         Map<String, List<PremioIntervalo>> invervaloProdutores = new HashMap<>();
 
+        List<PremioIntervalo> minList = new ArrayList<>();
+        List<PremioIntervalo> maxList = new ArrayList<>();
+
         for (Movie movie : movies) {
             // Faz o split dos produtores considerando vírgulas e " e "
             String[] produtores = movie.getProducers().split(",| and ");
 
             for (String produtor : produtores) {
                 produtor = produtor.trim();
+                
+                if (produtor.isEmpty()) continue;
 
                 invervaloProdutores.putIfAbsent(produtor, new ArrayList<>());
                 List<PremioIntervalo> intervaloEntrePremios = invervaloProdutores.get(produtor);
@@ -65,30 +70,30 @@ public class MovieService {
                 if (!intervaloEntrePremios.isEmpty()) {
                     //Busca o último premio do produtor para calcular o intervalo
                     PremioIntervalo last = intervaloEntrePremios.get(intervaloEntrePremios.size() - 1);
-                    int gap = movie.getYearReleased() - last.followingWin();
+                    Integer gap = movie.getYearReleased() - last.followingWin();
 
-                    intervaloEntrePremios.add(new PremioIntervalo(produtor, gap, last.followingWin(), movie.getYearReleased()));
+                    PremioIntervalo premioIntervalo = new PremioIntervalo(produtor, gap, last.followingWin(), movie.getYearReleased());
+                    intervaloEntrePremios.add(premioIntervalo);
+
+                    if (minList.isEmpty() || gap < minList.get(0).interval()) {
+                        minList.clear();
+                        minList.add(premioIntervalo);
+                    } else if (minList.get(0).interval().equals(gap)) {
+                        minList.add(premioIntervalo);
+                    }
+
+                    if (maxList.isEmpty() || gap > maxList.get(0).interval()) {
+                        maxList.clear();
+                        maxList.add(premioIntervalo);
+                    } else if (maxList.get(0).interval().equals(gap)) {
+                        maxList.add(premioIntervalo);
+                    }
+
                 } else {
                     intervaloEntrePremios.add(new PremioIntervalo(produtor, 0, movie.getYearReleased(), movie.getYearReleased()));
                 }
             }
         }
-        //Consolida todos os intevalos em uma única lista, filtrando apenas os que possuem intervalo maior que 0
-        List<PremioIntervalo> todos = invervaloProdutores.values().stream()
-            .flatMap(List::stream)
-            .filter(i -> i.interval() > 0)
-            .toList();
-
-        Integer minGap = todos.stream().mapToInt(PremioIntervalo::interval).min().orElse(0);
-        Integer maxGap = todos.stream().mapToInt(PremioIntervalo::interval).max().orElse(0);
-
-        List<PremioIntervalo> minList = todos.stream()
-                .filter(i -> i.interval().equals(minGap))
-                .toList();
-
-        List<PremioIntervalo> maxList = todos.stream()
-                .filter(i -> i.interval().equals(maxGap))
-                .toList();
 
         return new PremioIntervaloDTO(minList, maxList);
     }
